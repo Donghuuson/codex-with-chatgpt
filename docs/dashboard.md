@@ -6,10 +6,10 @@ Run on the host where the existing bridge runs:
 c2c dashboard -w /absolute/workspace
 ```
 
-For this Flatpak VS Code installation:
+For VS Code running in Flatpak, use host-accessible absolute paths:
 
 ```sh
-flatpak-spawn --host /home/dhs/.local/bin/node /var/home/dhs/Documents/Cne_Project/codex-with-chatgpt/bin/c2c.js dashboard -w /var/home/dhs/Documents/Cne_Project/bcbar-dhs
+flatpak-spawn --host /absolute/path/to/node /absolute/path/to/codex-with-chatgpt/bin/c2c.js dashboard -w /absolute/workspace
 ```
 
 Keep the command running and open its single-use viewer link within five

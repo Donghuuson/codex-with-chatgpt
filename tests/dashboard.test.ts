@@ -147,7 +147,7 @@ describe("dashboard data projection", () => {
       await new Promise((resolve) => setTimeout(resolve, 1050));
       const stale = await source();
       expect(stale.connection.online).toBe(false);
-      expect(stale.tasks).toHaveLength(1); expect(stale.connection.message).toContain("lần đọc gần nhất");
+      expect(stale.tasks).toHaveLength(1); expect(stale.connection.message).toContain("last successful read");
     } finally { cleanup(root); cleanup(state); }
   });
 });

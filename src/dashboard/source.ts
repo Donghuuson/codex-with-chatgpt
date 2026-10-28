@@ -71,10 +71,10 @@ function history(workspaceId: string): { sessions: DashboardSession[]; events: D
             if (record.status.sessionId !== saved.status.sessionId) throw new Error("Event identity mismatch");
             events.push({ id: `${saved.status.sessionId}:${index}`, at: record.at, taskId: record.status.activeTaskId,
               kind: "coordinator", state: record.status.state, reason: record.status.reason });
-          } catch { warnings.push("Một sự kiện điều phối không đọc được; dòng thời gian có thể thiếu."); }
+          } catch { warnings.push("A coordination event could not be read; the timeline may be incomplete."); }
         }
       }
-    } catch { warnings.push("Một bản ghi phiên không đọc được; lịch sử có thể thiếu."); }
+    } catch { warnings.push("A session record could not be read; history may be incomplete."); }
   }
   return { sessions, events, warnings: [...new Set(warnings)] };
 }
@@ -91,7 +91,7 @@ export function createDashboardSource(workspaceRoot: string): () => Promise<Dash
     const runtime = await findLiveBridge(workspace.id);
     let tasks = previous;
     const connection: DashboardSnapshot["connection"] = { online: false, executionEnabled: null,
-      message: "Không kết nối được cầu nối. Dữ liệu nhiệm vụ bên dưới là lần đọc gần nhất." };
+      message: "Cannot connect to the bridge. The tasks below are from the last successful read." };
     if (runtime) {
       try {
         const info = await adminFetch<{ executionEnabled: boolean }>(runtime, "GET", "/admin/info", 5000);
@@ -111,7 +111,7 @@ export function createDashboardSource(workspaceRoot: string): () => Promise<Dash
         }));
         previous = tasks;
         connection.online = true; connection.executionEnabled = info.executionEnabled === true;
-        connection.message = "Đang đọc trực tiếp từ cầu nối tại máy.";
+        connection.message = "Reading live data from the local bridge.";
       } catch { /* Preserve last successful data, explicitly labelled offline. */ }
     }
     const events = [...audit.events];

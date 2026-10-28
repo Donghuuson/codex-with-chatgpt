@@ -32,7 +32,7 @@ describe.skipIf(!playwrightPath)("dashboard real browser (opt-in)", () => {
       expect(new URL(page.url()).hash).toBe("");
       expect(await page.evaluate(() => document.cookie)).toBe("");
       expect(await page.locator("#result-text").textContent()).toBe("ABCDEF1234");
-      expect(await page.locator("#sessions").textContent()).toContain("Chờ nhiệm vụ mới đúng mục tiêu");
+      expect(await page.locator("#sessions").textContent()).toContain("Waiting for a new matching task");
       expect(await page.locator("#sessions").textContent()).toContain("Read report tests without copying task IDs");
       await page.locator("#parent-task").click();
       expect(await page.locator("#request-text").textContent()).toContain(hostile);

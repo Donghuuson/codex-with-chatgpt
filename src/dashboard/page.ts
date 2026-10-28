@@ -1,31 +1,31 @@
 /** Static, dependency-free viewer. All workspace content is rendered as text. */
 export const DASHBOARD_HTML = `<!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>C2C · Theo dõi cộng tác</title><link rel="stylesheet" href="/dashboard.css"><script src="/dashboard.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C2C · Collaboration dashboard</title><link rel="stylesheet" href="/dashboard.css"><script src="/dashboard.js" defer></script></head>
 <body><main class="shell">
-  <header><div class="brand"><span class="brand-mark" aria-hidden="true">↔</span><div><p class="eyebrow">CODEX WITH CHATGPT</p><h1>Theo dõi cộng tác</h1></div></div>
-    <div class="header-tools"><span class="readonly">Chỉ đọc · tại máy</span><button id="refresh" type="button">Làm mới</button></div></header>
-  <div class="connection"><span id="connection" role="status" class="status offline">Chưa kết nối</span><span id="workspace">Đang xác định workspace…</span><span id="updated">Tự cập nhật mỗi 2 giây</span></div>
+  <header><div class="brand"><span class="brand-mark" aria-hidden="true">↔</span><div><p class="eyebrow">CODEX WITH CHATGPT</p><h1>Collaboration dashboard</h1></div></div>
+    <div class="header-tools"><span class="readonly">Read-only · local</span><button id="refresh" type="button">Refresh</button></div></header>
+  <div class="connection"><span id="connection" role="status" class="status offline">Not connected</span><span id="workspace">Identifying workspace…</span><span id="updated">Updates every 2 seconds</span></div>
   <p id="notice" class="notice" role="alert" hidden></p>
-  <section class="stats" aria-label="Tổng quan nhiệm vụ">
-    <div><span>Tổng nhiệm vụ</span><strong id="count-all">—</strong></div><div><span>Đang chạy</span><strong id="count-running">—</strong></div>
-    <div><span>Chờ thực hiện</span><strong id="count-pending">—</strong></div><div><span>Hoàn thành</span><strong id="count-completed">—</strong></div>
+  <section class="stats" aria-label="Task overview">
+    <div><span>Total tasks</span><strong id="count-all">—</strong></div><div><span>Running</span><strong id="count-running">—</strong></div>
+    <div><span>Pending</span><strong id="count-pending">—</strong></div><div><span>Completed</span><strong id="count-completed">—</strong></div>
   </section>
-  <div class="workspace-layout"><aside class="panel task-panel"><div class="panel-heading"><h2>Nhiệm vụ</h2><span id="task-count" class="muted"></span></div>
-    <label class="sr-only" for="task-search">Tìm nhiệm vụ</label><input id="task-search" type="search" placeholder="Tìm nội dung hoặc mã nhiệm vụ…" autocomplete="off">
-    <label class="sr-only" for="task-filter">Lọc trạng thái</label><select id="task-filter"><option value="all">Tất cả trạng thái</option><option value="running">Đang chạy</option><option value="pending">Chờ thực hiện</option><option value="completed">Hoàn thành</option><option value="error">Lỗi / bị dừng</option></select>
+  <div class="workspace-layout"><aside class="panel task-panel"><div class="panel-heading"><h2>Tasks</h2><span id="task-count" class="muted"></span></div>
+    <label class="sr-only" for="task-search">Search tasks</label><input id="task-search" type="search" placeholder="Search task text or ID…" autocomplete="off">
+    <label class="sr-only" for="task-filter">Filter by state</label><select id="task-filter"><option value="all">All states</option><option value="running">Running</option><option value="pending">Pending</option><option value="completed">Completed</option><option value="error">Failed / stopped</option></select>
     <div id="task-list" class="task-list"></div></aside>
-    <div class="detail-column"><section class="panel"><div class="panel-heading"><div><p class="eyebrow">TRAO ĐỔI QUA CẦU NỐI</p><h2 id="detail-title">Chọn một nhiệm vụ</h2></div><span id="task-state" class="badge" hidden></span></div>
-      <div id="task-meta" class="meta"></div><button id="parent-task" type="button" class="parent-link" hidden>Xem nhiệm vụ trước</button>
-      <div class="exchange"><article class="message request"><div class="message-heading"><span class="avatar chatgpt" aria-hidden="true">G</span><div><h3>ChatGPT</h3><span>Gửi nhiệm vụ / yêu cầu sửa tiếp</span></div></div><pre id="request-text">Nội dung gửi qua cầu nối sẽ xuất hiện tại đây.</pre></article>
-      <article class="message response"><div class="message-heading"><span class="avatar codex" aria-hidden="true">C</span><div><h3>Codex</h3><span>Thực thi và trả kết quả cuối</span></div></div><pre id="result-text">Chưa có kết quả được phát hành.</pre><p id="result-note" class="muted"></p></article></div>
+    <div class="detail-column"><section class="panel"><div class="panel-heading"><div><p class="eyebrow">BRIDGE EXCHANGE</p><h2 id="detail-title">Select a task</h2></div><span id="task-state" class="badge" hidden></span></div>
+      <div id="task-meta" class="meta"></div><button id="parent-task" type="button" class="parent-link" hidden>View parent task</button>
+      <div class="exchange"><article class="message request"><div class="message-heading"><span class="avatar chatgpt" aria-hidden="true">G</span><div><h3>ChatGPT</h3><span>Task submission / revision request</span></div></div><pre id="request-text">Tasks submitted through the bridge appear here.</pre></article>
+      <article class="message response"><div class="message-heading"><span class="avatar codex" aria-hidden="true">C</span><div><h3>Codex</h3><span>Execution and final result</span></div></div><pre id="result-text">No released result yet.</pre><p id="result-note" class="muted"></p></article></div>
       <p id="approval-note" class="notice" hidden></p>
-      <div class="evidence-note">“Đã phát hành” chỉ xác nhận kết quả đã được mở cho ChatGPT đọc, không tự chứng minh ChatGPT đã đọc. Nhiệm vụ nối tiếp cho biết quan hệ giữa các lượt.</div>
+      <div class="evidence-note">“Released” only means the result is available to ChatGPT; it is not proof that ChatGPT has read it. Follow-ups show the relationship between turns.</div>
     </section>
-    <section class="panel"><div class="panel-heading"><h2>Dòng thời gian</h2><span class="muted">Sự kiện đã ghi nhận của nhiệm vụ đang chọn</span></div><ol id="timeline" class="timeline"></ol></section>
+    <section class="panel"><div class="panel-heading"><h2>Timeline</h2><span class="muted">Recorded events for the selected task</span></div><ol id="timeline" class="timeline"></ol></section>
     </div></div>
-  <section class="panel sessions-panel"><div class="panel-heading"><h2>Phiên điều phối</h2><span class="muted">Tối đa 20 phiên gần nhất</span></div><div id="sessions" class="sessions"></div></section>
-  <footer>Dashboard chỉ đọc. Không duyệt, chạy hoặc cấp thêm quyền. Không hiển thị toàn bộ cuộc trò chuyện hay từng lệnh thực thi của Codex.</footer>
+  <section class="panel sessions-panel"><div class="panel-heading"><h2>Coordination sessions</h2><span class="muted">Up to 20 recent sessions</span></div><div id="sessions" class="sessions"></div></section>
+  <footer>Read-only dashboard. No approvals, execution controls or permission grants. Does not show complete conversations or individual Codex commands.</footer>
 </main></body></html>`;
 
 export const DASHBOARD_CSS = `
@@ -40,11 +40,11 @@ export const DASHBOARD_JS = String.raw`
 (() => {
   "use strict";
   const el = id => document.getElementById(id);
-  const labels = {pending:"Chờ duyệt",approved:"Đã duyệt",running:"Đang chạy",completed:"Hoàn thành",failed:"Lỗi",rejected:"Từ chối",interrupted:"Bị gián đoạn",authorizing:"Chuẩn bị phiên",waiting_for_task:"Chờ nhiệm vụ mới đúng mục tiêu",waiting_for_chatgpt:"Chờ ChatGPT",waiting_for_user:"Cần người duyệt",limit_reached:"Đạt giới hạn lượt",expired:"Hết hạn",stopped:"Đã dừng",blocked:"Bị chặn"};
-  const reasons = {codex_approval_required:"Codex đang yêu cầu thêm quyền; dashboard không cấp quyền.",ambiguous_root_tasks:"Có nhiều nhiệm vụ mới cùng khớp mục tiêu; không tự chọn nhiệm vụ nào.",root_task_not_pending:"Nhiệm vụ gốc đã được xử lý ngoài phiên này; không tự nhận chạy lại.",ambiguous_followups:"Có nhiều nhánh nối tiếp; phiên đã dừng để tránh tự chọn nhánh.",local_stop:"Đã nhận yêu cầu dừng tại máy.",cancellation_unconfirmed:"Chưa xác nhận được việc dừng tiến trình.",task_outside_authorized_messages:"Nhiệm vụ nằm ngoài nội dung đã cho phép.",local_api_or_audit_error:"Không đọc được API cục bộ hoặc không ghi được nhật ký."};
+  const labels = {pending:"Awaiting review",approved:"Approved",running:"Running",completed:"Completed",failed:"Failed",rejected:"Rejected",interrupted:"Interrupted",authorizing:"Preparing session",waiting_for_task:"Waiting for a new matching task",waiting_for_chatgpt:"Waiting for ChatGPT",waiting_for_user:"Operator review needed",limit_reached:"Task limit reached",expired:"Expired",stopped:"Stopped",blocked:"Blocked"};
+  const reasons = {codex_approval_required:"Codex is requesting additional permissions; this dashboard cannot grant them.",ambiguous_root_tasks:"Multiple new tasks match the goal; none was selected automatically.",root_task_not_pending:"The root task was already handled outside this session; it will not be adopted or rerun.",ambiguous_followups:"Multiple follow-up branches exist; the session stopped rather than choosing a branch.",local_stop:"Local stop requested.",cancellation_unconfirmed:"Process cancellation has not been confirmed.",task_outside_authorized_messages:"The task is outside the authorized message list.",local_api_or_audit_error:"The local API or audit log could not be accessed."};
   const text = (id, value) => { el(id).textContent = value; };
   const node = (tag, value, cls) => { const item=document.createElement(tag); if(value!==undefined)item.textContent=value; if(cls)item.className=cls; return item; };
-  const format = value => new Date(value).toLocaleString("vi-VN",{hour12:false});
+  const format = value => new Date(value).toLocaleString("en-GB",{hour12:false});
   let snapshot=null, selected=null, signature="", busy=false, stopped=false;
   function badge(value) { return node("span", labels[value] || value, "badge " + value); }
   function list() {
@@ -54,43 +54,43 @@ export const DASHBOARD_JS = String.raw`
     for(const task of tasks) {
       const button=node("button", undefined, "task-item"); button.type="button"; button.setAttribute("aria-pressed",String(task.id===selected)); button.dataset.taskId=task.id;
       button.append(badge(task.state),node("span",task.message.slice(0,110)+(task.message.length>110?"…":""),"task-item-title"));
-      const meta=node("span",undefined,"task-item-meta"); meta.append(node("span",task.id.slice(0,8)),node("span",task.parentId?"↳ Nối tiếp":"Nhiệm vụ gốc")); button.append(meta);
+      const meta=node("span",undefined,"task-item-meta"); meta.append(node("span",task.id.slice(0,8)),node("span",task.parentId?"↳ Follow-up":"Root task")); button.append(meta);
       button.addEventListener("click",()=>{selected=task.id;list();detail();}); fragment.append(button);
     }
-    if(!tasks.length) fragment.append(node("p","Không có nhiệm vụ phù hợp.","empty"));
+    if(!tasks.length) fragment.append(node("p","No matching tasks.","empty"));
     target.replaceChildren(fragment); text("task-count",tasks.length+" / "+snapshot.tasks.length);
   }
   function detail() {
     const task=snapshot.tasks.find(task=>task.id===selected);
-    if(!task) {text("detail-title","Chưa có nhiệm vụ");text("request-text","Nhiệm vụ mới sẽ xuất hiện khi ChatGPT gửi qua cầu nối.");text("result-text","Chưa có kết quả được phát hành.");text("task-meta","");text("result-note","");el("task-state").hidden=true;el("parent-task").hidden=true;el("approval-note").hidden=true;el("timeline").replaceChildren();return;}
-    text("detail-title","Nhiệm vụ "+task.id.slice(0,8)); const state=el("task-state");state.hidden=false;state.className="badge "+task.state;state.textContent=labels[task.state]||task.state;
-    text("task-meta","Tạo: "+format(task.createdAt)+" · Cập nhật trạng thái: "+format(task.updatedAt)+" · Client: "+task.owner+(task.threadId?" · Luồng: "+task.threadId:""));
-    const parent=el("parent-task");parent.hidden=!task.parentId;parent.textContent="← Nhiệm vụ trước: "+(task.parentId||"").slice(0,8);parent.onclick=()=>{if(snapshot.tasks.some(item=>item.id===task.parentId)){selected=task.parentId;list();detail();}};
+    if(!task) {text("detail-title","No tasks yet");text("request-text","New tasks appear when ChatGPT submits them through the bridge.");text("result-text","No released result yet.");text("task-meta","");text("result-note","");el("task-state").hidden=true;el("parent-task").hidden=true;el("approval-note").hidden=true;el("timeline").replaceChildren();return;}
+    text("detail-title","Task "+task.id.slice(0,8)); const state=el("task-state");state.hidden=false;state.className="badge "+task.state;state.textContent=labels[task.state]||task.state;
+    text("task-meta","Created: "+format(task.createdAt)+" · State updated: "+format(task.updatedAt)+" · Client: "+task.owner+(task.threadId?" · Thread: "+task.threadId:""));
+    const parent=el("parent-task");parent.hidden=!task.parentId;parent.textContent="← Parent task: "+(task.parentId||"").slice(0,8);parent.onclick=()=>{if(snapshot.tasks.some(item=>item.id===task.parentId)){selected=task.parentId;list();detail();}};
     text("request-text",task.message);
-    text("result-text",task.resultReleased?(task.result||"Kết quả rỗng."):(task.state==="completed"?"Codex đã hoàn thành. Kết quả chưa được phát hành.":"Chưa có kết quả được phát hành."));
-    text("result-note",(task.resultReleased?"Đã phát hành cho ChatGPT đọc.":"Không hiển thị kết quả chưa phát hành.")+(task.resultTruncated?" Chỉ hiển thị 16.000 ký tự đầu.":"")+(task.failureStage?" Giai đoạn lỗi: "+task.failureStage:""));
-    const approval=el("approval-note");approval.hidden=!(task.approvalCount>0||task.approvalCount===null);approval.textContent=task.approvalCount===null?"Không đọc được trạng thái yêu cầu thêm quyền.":"Có "+task.approvalCount+" yêu cầu thêm quyền đang chờ. Chỉ người duyệt tại máy có thể quyết định; dashboard không cấp quyền.";
+    text("result-text",task.resultReleased?(task.result||"Empty result."):(task.state==="completed"?"Codex completed the task. The result has not been released.":"No released result yet."));
+    text("result-note",(task.resultReleased?"Released for ChatGPT to read.":"Unreleased results are not shown.")+(task.resultTruncated?" Showing the first 16,000 characters only.":"")+(task.failureStage?" Failure stage: "+task.failureStage:""));
+    const approval=el("approval-note");approval.hidden=!(task.approvalCount>0||task.approvalCount===null);approval.textContent=task.approvalCount===null?"Additional permission request status could not be read.":task.approvalCount+" additional permission request(s) pending. Only the local operator can decide; this dashboard cannot grant permissions.";
     const events=snapshot.events.filter(event=>event.taskId===task.id), timeline=el("timeline"), fragment=document.createDocumentFragment();
-    for(const event of events){const item=node("li"), time=node("time",format(event.at));time.dateTime=event.at;const body=node("div",event.kind==="received"?"ChatGPT gửi nhiệm vụ":event.kind==="task_state"?"Trạng thái nhiệm vụ: "+(labels[event.state]||event.state):"Điều phối: "+(labels[event.state]||event.state));if(event.reason)body.append(node("p",reasons[event.reason]||event.reason,"event-detail"));item.append(time,body);fragment.append(item);}
-    if(!events.length)fragment.append(node("li","Chưa có sự kiện được ghi nhận.","empty"));timeline.replaceChildren(fragment);
+    for(const event of events){const item=node("li"), time=node("time",format(event.at));time.dateTime=event.at;const body=node("div",event.kind==="received"?"ChatGPT submitted a task":event.kind==="task_state"?"Task state: "+(labels[event.state]||event.state):"Coordinator: "+(labels[event.state]||event.state));if(event.reason)body.append(node("p",reasons[event.reason]||event.reason,"event-detail"));item.append(time,body);fragment.append(item);}
+    if(!events.length)fragment.append(node("li","No recorded events yet.","empty"));timeline.replaceChildren(fragment);
   }
   function sessions() {
     const fragment=document.createDocumentFragment();
-    for(const session of snapshot.sessions){const card=node("article",undefined,"session");card.append(badge(session.state),node("p","Phiên "+session.sessionId.slice(0,8)));if(session.goal)card.append(node("p","Mục tiêu: "+session.goal.slice(0,250)+(session.goal.length>250?"…":"")));card.append(node("p",session.handled.length+" / "+session.maxTasks+" nhiệm vụ đã xử lý"),node("p","Hạn phiên: "+format(session.expiresAt)));if(session.expiresAt<Date.now()&&["running","authorizing","waiting_for_task","waiting_for_chatgpt","waiting_for_user"].includes(session.state))card.append(node("p","Hạn đã qua; trạng thái bên trên là bản ghi cuối, không phải xác nhận phiên còn chạy."));if(session.reason)card.append(node("p",reasons[session.reason]||session.reason));if(session.state==="limit_reached")card.append(node("p","Đạt giới hạn không đồng nghĩa mục tiêu đã được kiểm chứng."));fragment.append(card);}
-    if(!snapshot.sessions.length)fragment.append(node("p","Chưa có bản ghi phiên điều phối.","empty"));el("sessions").replaceChildren(fragment);
+    for(const session of snapshot.sessions){const card=node("article",undefined,"session");card.append(badge(session.state),node("p","Session "+session.sessionId.slice(0,8)));if(session.goal)card.append(node("p","Goal: "+session.goal.slice(0,250)+(session.goal.length>250?"…":"")));card.append(node("p",session.handled.length+" / "+session.maxTasks+" tasks handled"),node("p","Session deadline: "+format(session.expiresAt)));if(session.expiresAt<Date.now()&&["running","authorizing","waiting_for_task","waiting_for_chatgpt","waiting_for_user"].includes(session.state))card.append(node("p","The deadline has passed. The state above is the last recorded state, not confirmation that the session is still running."));if(session.reason)card.append(node("p",reasons[session.reason]||session.reason));if(session.state==="limit_reached")card.append(node("p","Reaching the limit does not mean the goal has been verified."));fragment.append(card);}
+    if(!snapshot.sessions.length)fragment.append(node("p","No coordination sessions recorded yet.","empty"));el("sessions").replaceChildren(fragment);
   }
   function render(data) {
     snapshot=data;
-    const status=el("connection");status.textContent=data.connection.online?"Cầu nối đang hoạt động":"Mất kết nối · dữ liệu có thể cũ";status.className="status "+(data.connection.online?"online":"offline");
-    text("workspace",data.workspace.name+" · "+data.workspace.id);text("updated","Lần đọc: "+format(data.updatedAt));
-    const warnings=[...data.warnings];if(!data.connection.online)warnings.unshift(data.connection.message);if(data.connection.online&&!data.connection.executionEnabled)warnings.push("Quyền thực thi đang tắt trên cầu nối. Dashboard không thay đổi thiết lập này.");
+    const status=el("connection");status.textContent=data.connection.online?"Bridge connected":"Disconnected · data may be stale";status.className="status "+(data.connection.online?"online":"offline");
+    text("workspace",data.workspace.name+" · "+data.workspace.id);text("updated","Last read: "+format(data.updatedAt));
+    const warnings=[...data.warnings];if(!data.connection.online)warnings.unshift(data.connection.message);if(data.connection.online&&!data.connection.executionEnabled)warnings.push("Execution is disabled on the bridge. This dashboard does not change that setting.");
     const notice=el("notice");notice.hidden=!warnings.length;notice.textContent=warnings.join(" ");
     const next=JSON.stringify([data.tasks,data.sessions,data.events]);
     if(next!==signature){signature=next;if(!data.tasks.some(task=>task.id===selected))selected=data.tasks[0]?.id||null;list();detail();}
     sessions();text("count-all",data.tasks.length);text("count-running",data.tasks.filter(task=>task.state==="running").length);text("count-pending",data.tasks.filter(task=>["pending","approved"].includes(task.state)).length);text("count-completed",data.tasks.filter(task=>task.state==="completed").length);
   }
-  async function fetchJson(url, options={}) {const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),7000);try{const response=await fetch(url,{...options,credentials:"same-origin",cache:"no-store",signal:controller.signal});if(!response.ok){const error=new Error(response.status===401?"Mở liên kết truy cập một lần do lệnh dashboard cung cấp. Liên kết cũ có thể đã dùng hoặc hết hạn.":"Không đọc được dashboard. Dữ liệu hiện tại có thể đã cũ.");error.status=response.status;throw error;}return await response.json();}finally{clearTimeout(timer);}}
-  async function refresh(){if(busy||stopped)return;busy=true;el("refresh").disabled=true;try{render(await fetchJson("/api/snapshot"));}catch(error){const notice=el("notice");notice.hidden=false;notice.textContent=error.message;text("connection","Không đọc được dữ liệu mới");el("connection").className="status offline";if(error.status===401)stopped=true;}finally{busy=false;el("refresh").disabled=false;}}
+  async function fetchJson(url, options={}) {const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),7000);try{const response=await fetch(url,{...options,credentials:"same-origin",cache:"no-store",signal:controller.signal});if(!response.ok){const error=new Error(response.status===401?"Open the single-use access link provided by the dashboard command. The previous link may have been used or expired.":"Cannot read the dashboard. Displayed data may be stale.");error.status=response.status;throw error;}return await response.json();}finally{clearTimeout(timer);}}
+  async function refresh(){if(busy||stopped)return;busy=true;el("refresh").disabled=true;try{render(await fetchJson("/api/snapshot"));}catch(error){const notice=el("notice");notice.hidden=false;notice.textContent=error.message;text("connection","Cannot read fresh data");el("connection").className="status offline";if(error.status===401)stopped=true;}finally{busy=false;el("refresh").disabled=false;}}
   el("refresh").addEventListener("click",()=>{stopped=false;refresh();});el("task-search").addEventListener("input",()=>snapshot&&list());el("task-filter").addEventListener("change",()=>snapshot&&list());
   async function start(){const code=location.hash.slice(1);if(code){history.replaceState(null,"","/");try{await fetchJson("/api/session",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code})});}catch(error){el("notice").hidden=false;text("notice",error.message);stopped=true;return;}}await refresh();}
   async function poll(){if(!stopped)await refresh();setTimeout(poll,document.hidden?8000:2000);}

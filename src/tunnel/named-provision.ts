@@ -127,19 +127,19 @@ export function inspectNamedTunnelCredentials(tunnelId?: string): NamedTunnelCre
 export function namedTunnelCredentialRepairMessage(status: NamedTunnelCredentialStatus): string {
   switch (status) {
     case "missing_account_certificate":
-      return "固定域名缺少 Cloudflare 账号证书。请运行 cloudflared tunnel login，完成后再运行 c2c doctor。";
+      return "The stable hostname is missing its Cloudflare account certificate. Run cloudflared tunnel login, then run c2c doctor.";
     case "missing_credentials":
-      return "固定域名缺少 Tunnel 凭据文件。请使用 cloudflared tunnel token --cred-file \"%USERPROFILE%\\.cloudflared\\<TUNNEL-UUID>.json\" <TUNNEL-UUID> 恢复该 Tunnel，再运行 c2c doctor。";
+      return "The stable hostname is missing its tunnel credential file. Restore the tunnel with cloudflared tunnel token --cred-file \"%USERPROFILE%\\.cloudflared\\<TUNNEL-UUID>.json\" <TUNNEL-UUID>, then run c2c doctor.";
     case "unreadable_credentials":
-      return "固定域名的 Tunnel 凭据文件不可读或过大。请恢复正确的 UUID.json 文件权限和内容，再运行 c2c doctor。";
+      return "The stable hostname tunnel credential file is unreadable or too large. Restore the correct UUID.json permissions and content, then run c2c doctor.";
     case "invalid_credentials":
-      return "固定域名的 Tunnel 凭据文件不是有效的本地 Tunnel JSON。请恢复正确文件，再运行 c2c doctor。";
+      return "The stable hostname credential file is not valid local tunnel JSON. Restore the correct file, then run c2c doctor.";
     case "mismatched_credentials":
-      return "固定域名的 Tunnel 凭据与当前保存的 Tunnel ID 不匹配。请恢复对应的 UUID.json 文件，再运行 c2c doctor。";
+      return "The stable hostname credential does not match the saved tunnel ID. Restore the matching UUID.json file, then run c2c doctor.";
     case "missing_tunnel_id":
-      return "固定域名状态缺少 Tunnel ID。请运行 c2c setup 重新保存 Named Tunnel 状态。";
+      return "The stable hostname state is missing its tunnel ID. Run c2c setup to save the named tunnel state again.";
     case "ready":
-      return "固定域名凭据已就绪。";
+      return "Stable hostname credentials are ready.";
   }
 }
 
