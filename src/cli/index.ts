@@ -59,6 +59,9 @@ import {
 import { appendExecutionRecord } from "../execution/records.js";
 import { saveExecutionOutput } from "../execution/output.js";
 import { importMediaAsset } from "../media/import.js";
+import { readExecutionSettings, writeExecutionSettings } from "../execution/settings.js";
+import { superviseLocalSession } from "../execution/coordinator-session.js";
+import { startDashboard } from "../dashboard/server.js";
 
 const program = new Command();
 
@@ -727,6 +730,116 @@ program
   });
 
 // ---------------------------------------------------------------- pair / unpair
+
+program.command("dashboard").description("Open a loopback-only, read-only collaboration viewer; never restart the bridge")
+  .option("-w, --workspace <path>").option("--port <number>", "local viewer port (0 chooses a free port)", parseNonNegativeInteger, 0)
+  .action(async (opts: { workspace?: string; port: number }) => {
+    try {
+      if (opts.port > 65535) throw new Error("Invalid dashboard port");
+      const dashboard = await startDashboard({ workspaceRoot: resolveWorkspace(opts.workspace), port: opts.port });
+      say("Read-only dashboard. Open this single-use viewer link within 5 minutes:");
+      say(dashboard.accessUrl);
+      say("No bridge restart or additional execution permissions. Ctrl-C stops only the dashboard.");
+      const stop = (): void => { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); void dashboard.close().catch(() => { process.exitCode = 1; }); };
+      process.once("SIGINT", stop); process.once("SIGTERM", stop);
+    } catch (error) { handleCliError(error, false); }
+  });
+
+const tasksCommand = program.command("tasks").description("Review experimental tasks on this computer");
+tasksCommand.command("configure").requiredOption("--codex <path>", "absolute Codex executable path").option("--enable", "enable task tools on the next bridge start", false).option("-w, --workspace <path>").action((opts: { codex: string; enable: boolean; workspace?: string }) => {
+  try {
+    const workspace = new Workspace(resolveWorkspace(opts.workspace));
+    writeExecutionSettings({ workspaceId: workspace.id, root: workspace.root, command: opts.codex, enabled: opts.enable });
+    say("Execution settings saved. They take effect on the next bridge start; the running bridge was not changed.");
+  } catch (error) { handleCliError(error, false); }
+});
+tasksCommand.command("settings").option("-w, --workspace <path>").action((opts: { workspace?: string }) => {
+  try {
+    const workspace = new Workspace(resolveWorkspace(opts.workspace));
+    say(JSON.stringify(readExecutionSettings(workspace.id, workspace.root) ?? { enabled: false }, null, 2));
+  } catch (error) { handleCliError(error, false); }
+});
+async function taskAdminRequest(workspacePath: string | undefined, method: "GET" | "POST", route: string): Promise<void> {
+  const workspace = new Workspace(resolveWorkspace(workspacePath));
+  const runtime = await findLiveBridge(workspace.id);
+  if (!runtime) throw new Error("Bridge is not running");
+  say(JSON.stringify(await adminFetch(runtime, method, route), null, 2));
+}
+tasksCommand.command("list").option("-w, --workspace <path>").action(async (opts: { workspace?: string }) => {
+  try { await taskAdminRequest(opts.workspace, "GET", "/admin/tasks"); } catch (error) { handleCliError(error, false); }
+});
+tasksCommand.command("start")
+  .description("Authorize a goal once and automatically bind its next matching new root; no task ID required")
+  .requiredOption("--goal <text>", "exact first task text approved on this computer")
+  .requiredOption("--max-tasks <count>", "maximum tasks including root (1-12)", parseInteger)
+  .requiredOption("--minutes <count>", "session lifetime including root wait (1-60 minutes)", parseInteger)
+  .option("--allow-followups", "authorize same-owner linear follow-ups", false)
+  .option("--allow-message <text...>", "optional exact permitted task messages")
+  .option("--client <id>", "local operator override when multiple task-authorized clients exist")
+  .option("--json", "machine-readable session events", false).option("-w, --workspace <path>")
+  .action(async (opts: { goal: string; maxTasks: number; minutes: number; allowFollowups: boolean; allowMessage?: string[]; client?: string; json: boolean; workspace?: string }) => {
+    const controller = new AbortController(); const stop = (): void => controller.abort();
+    process.once("SIGINT", stop); process.once("SIGTERM", stop);
+    try {
+      if (opts.minutes < 1 || opts.minutes > 60) throw new Error("Session lifetime must be 1-60 minutes");
+      const workspace = new Workspace(resolveWorkspace(opts.workspace));
+      const runtime = await findLiveBridge(workspace.id);
+      if (!runtime) throw new Error("Bridge is not running");
+      const info = await adminFetch<{ executionEnabled: boolean }>(runtime, "GET", "/admin/info", 5000);
+      if (!info.executionEnabled) throw new Error("Execution is not enabled on this bridge");
+      const clients = new AuthStore(workspace.id).authorizedClients("task.submit");
+      if (opts.client && !clients.includes(opts.client)) throw new Error("Selected client has no current task submission grant");
+      if (!opts.client && clients.length !== 1) throw new Error(clients.length ? "Multiple task-authorized connections exist; explicitly select one locally or revoke obsolete grants. No task was approved." : "No task-authorized connection exists. No task was approved.");
+      if (!opts.json) say("Authorize this exact goal once. Send it as a NEW task in ChatGPT, without parent_id. No task IDs need to be copied:\n" + opts.goal);
+      const result = await superviseLocalSession(runtime, { goal: opts.goal, owner: opts.client ?? clients[0],
+        maxTasks: opts.maxTasks, expiresAt: Date.now() + opts.minutes * 60_000, allowFollowups: opts.allowFollowups,
+        allowedMessages: opts.allowMessage }, controller.signal, (status) => {
+          if (opts.json) say(JSON.stringify(status));
+          else say(`${status.state} · ${status.handled.length}/${status.maxTasks}${status.reason ? " · " + status.reason : ""}`);
+        });
+      if (result.state === "blocked") process.exitCode = 1;
+    } catch (error) { handleCliError(error, opts.json); }
+    finally { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); }
+  });
+tasksCommand.command("supervise").argument("<rootTaskId>")
+  .description("Authorize one bounded task chain locally; never accept Codex escalation approvals")
+  .requiredOption("--max-tasks <count>", "maximum tasks including root (1-12)", parseInteger)
+  .requiredOption("--minutes <count>", "session lifetime (1-60 minutes)", parseInteger)
+  .option("--allow-followups", "authorize same-owner linear descendants in this workspace", false)
+  .option("--allow-message <text...>", "optional exact permitted task messages")
+  .option("-w, --workspace <path>")
+  .action(async (rootTaskId: string, opts: { maxTasks: number; minutes: number; allowFollowups: boolean; allowMessage?: string[]; workspace?: string }) => {
+    const controller = new AbortController();
+    const stop = (): void => controller.abort();
+    process.once("SIGINT", stop); process.once("SIGTERM", stop);
+    try {
+      if (!Number.isInteger(opts.minutes) || opts.minutes < 1 || opts.minutes > 60) throw new Error("Session lifetime must be 1-60 minutes");
+      const workspace = new Workspace(resolveWorkspace(opts.workspace));
+      const runtime = await findLiveBridge(workspace.id);
+      if (!runtime) throw new Error("Bridge is not running");
+      const info = await adminFetch<{ executionEnabled: boolean }>(runtime, "GET", "/admin/info", 5000);
+      if (!info.executionEnabled) throw new Error("Execution is not enabled on this bridge");
+      const result = await superviseLocalSession(runtime, { rootTaskId, maxTasks: opts.maxTasks,
+        expiresAt: Date.now() + opts.minutes * 60_000, allowFollowups: opts.allowFollowups,
+        allowedMessages: opts.allowMessage }, controller.signal, (status) => say(JSON.stringify(status)));
+      if (result.state === "blocked") process.exitCode = 1;
+    } catch (error) { handleCliError(error, false); }
+    finally { process.removeListener("SIGINT", stop); process.removeListener("SIGTERM", stop); }
+  });
+for (const action of ["approve", "reject", "run", "release", "approvals", "cancel"] as const) {
+  tasksCommand.command(action).argument("<id>").option("-w, --workspace <path>").action(async (id: string, opts: { workspace?: string }) => {
+    try {
+      if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Invalid task ID");
+      await taskAdminRequest(opts.workspace, action === "approvals" ? "GET" : "POST", `/admin/tasks/${id}/${action}`);
+    } catch (error) { handleCliError(error, false); }
+  });
+}
+tasksCommand.command("decide").argument("<id>").argument("<requestId>").argument("<decision>").option("-w, --workspace <path>").action(async (id: string, requestId: string, decision: string, opts: { workspace?: string }) => {
+  try {
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !/^[A-Za-z0-9_-]{1,100}$/.test(requestId) || !["accept", "decline"].includes(decision)) throw new Error("Invalid approval decision");
+    await taskAdminRequest(opts.workspace, "POST", `/admin/tasks/${id}/approvals/${requestId}/${decision}`);
+  } catch (error) { handleCliError(error, false); }
+});
 
 program
   .command("pair")

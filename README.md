@@ -3,6 +3,14 @@
 > ChatGPT thinks. Codex works.
 > ChatGPT 负责思考，Codex 负责干活。
 
+This development branch adds optional, locally reviewed Codex task execution
+and a bounded coordinator (`c2c tasks supervise`) for automatic follow-ups
+after one local session authorization.
+The existing read tools remain the default. See [Task execution](docs/task-execution.md)
+for configuration, permissions, verification and the ChatGPT acceptance check.
+The [local read-only dashboard](docs/dashboard.md) displays requests, released
+results and coordinator history without restarting the bridge.
+
 > [!IMPORTANT]
 > **遇到问题？** 请先向 Codex 发送 **「更新 Codex with ChatGPT」** 并重试。更新到最新版本可以解决大多数已知问题。  
 > **Having trouble?** First ask Codex to **“Update Codex with ChatGPT”** and try again. Updating to the latest version resolves most known issues.

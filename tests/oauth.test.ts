@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import path from "node:path";
 import { startBridge, type Bridge } from "../src/bridge/server.js";
+import { filterScopes } from "../src/auth/store.js";
 import { makeTmpDir, cleanup, write, isolateStateDir, pkceVerifierAndChallenge } from "./helpers.js";
 
 let root: string;
@@ -8,6 +9,14 @@ let bridge: Bridge;
 let base: string;
 
 const REDIRECT_URI = "http://127.0.0.1:19999/callback";
+
+describe("task submission scope", () => {
+  it("never grants task submission by default or for unknown scopes", () => {
+    expect(filterScopes(undefined)).not.toContain("task.submit");
+    expect(filterScopes("unknown")).not.toContain("task.submit");
+    expect(filterScopes("workspace.read task.submit")).toContain("task.submit");
+  });
+});
 
 beforeAll(async () => {
   isolateStateDir();

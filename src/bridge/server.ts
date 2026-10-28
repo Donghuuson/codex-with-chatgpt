@@ -16,6 +16,11 @@ import { Logger, nullLogger } from "../logger/index.js";
 import { DEFAULT_HOST, DEFAULT_PORT } from "../config/paths.js";
 import { SERVICE_NAME, VERSION } from "../version.js";
 import { writeRuntimeState, clearRuntimeState, type RuntimeState } from "./runtime.js";
+import { TaskQueue } from "../execution/task-queue.js";
+import { TaskRunner } from "../execution/task-runner.js";
+import { readExecutionSettings } from "../execution/settings.js";
+import { getStateDir } from "../config/paths.js";
+import path from "node:path";
 
 function tunnelForWorkspace(workspaceId: string, logger: Logger): TunnelProvider {
   const binding = namedTunnelBinding(readTunnelState(workspaceId));
@@ -40,6 +45,10 @@ export interface BridgeOptions {
   authStoreFile?: string;
   pairingTtlMs?: number;
   accessTokenTtlMs?: number;
+  /** Experimental test-only opt-in. No execution is enabled. */
+  taskQueue?: TaskQueue;
+  /** Experimental injection only; no CLI enables execution. */
+  taskRunner?: TaskRunner;
 }
 
 export interface Bridge {
@@ -82,6 +91,10 @@ function listen(app: express.Express, host: string, preferredPort: number): Prom
 export async function startBridge(opts: BridgeOptions): Promise<Bridge> {
   const logger = opts.logger ?? nullLogger;
   const workspace = new Workspace(opts.workspaceRoot);
+  const executionSettings = readExecutionSettings(workspace.id, workspace.root);
+  const taskQueue = opts.taskQueue ?? (executionSettings?.enabled ? new TaskQueue(path.join(getStateDir(), "tasks", `${workspace.id}.json`)) : undefined);
+  const taskRunner = opts.taskRunner ?? (executionSettings?.enabled && taskQueue ? new TaskRunner(taskQueue, workspace.root, executionSettings.command) : undefined);
+  if (opts.taskRunner && !opts.taskQueue) throw new Error("Task runner requires its queue");
   const host = opts.host ?? DEFAULT_HOST;
   if (host !== "127.0.0.1" && host !== "::1" && host !== "localhost") {
     throw new Error("The bridge only binds to loopback addresses. Public exposure goes through the tunnel.");
@@ -125,7 +138,7 @@ export async function startBridge(opts: BridgeOptions): Promise<Bridge> {
 
   // ---- MCP endpoint (bearer-protected) --------------------------------------
 
-  const mcpHandler = createMcpHttpHandler(() => createMcpServer({ workspace, logger }), logger);
+  const mcpHandler = createMcpHttpHandler(() => createMcpServer({ workspace, logger, taskQueue }), logger);
   app.all(
     "/mcp",
     express.json({ limit: "8mb" }),
@@ -151,6 +164,72 @@ export async function startBridge(opts: BridgeOptions): Promise<Bridge> {
     next();
   };
 
+  if (taskQueue) {
+    const queue = taskQueue;
+    app.get("/admin/tasks", adminGuard, (_req, res) => {
+      res.json({ tasks: queue.list() });
+    });
+    app.post("/admin/tasks/:id/approve", adminGuard, (req, res) => {
+      try {
+        const id = req.params.id;
+        if (typeof id !== "string") throw new Error("Invalid task ID");
+        res.json({ task: queue.transition(id, "pending", "approved") });
+      } catch {
+        res.status(409).json({ error: "invalid_task_transition" });
+      }
+    });
+    app.post("/admin/tasks/:id/reject", adminGuard, (req, res) => {
+      try {
+        const id = req.params.id;
+        if (typeof id !== "string") throw new Error("Invalid task ID");
+        res.json({ task: queue.transition(id, "pending", "rejected") });
+      } catch {
+        res.status(409).json({ error: "invalid_task_transition" });
+      }
+    });
+    app.post("/admin/tasks/:id/release", adminGuard, (req, res) => {
+      try {
+        const id = req.params.id;
+        if (typeof id !== "string") throw new Error("Invalid task ID");
+        queue.releaseResult(id);
+        res.json({ released: true });
+      } catch {
+        res.status(409).json({ error: "result_unavailable" });
+      }
+    });
+    if (taskRunner) {
+      const runner = taskRunner;
+      app.post("/admin/tasks/:id/run", adminGuard, (req, res) => {
+        const task = queue.list().find((entry) => entry.id === req.params.id);
+        if (!task || task.state !== "approved" || !runner.canRun()) { res.status(409).json({ error: "task_not_runnable" }); return; }
+        try { runner.validateWorkspace(); }
+        catch { res.status(409).json({ error: "workspace_unavailable", message: "Workspace directory is not accessible to the Codex process." }); return; }
+        void runner.run(task.owner, task.id).catch(() => logger.error("Experimental task failed to start"));
+        res.status(202).json({ accepted: true });
+      });
+      app.get("/admin/tasks/:id/approvals", adminGuard, (req, res) => {
+        const id = req.params.id;
+        if (typeof id !== "string") { res.status(400).end(); return; }
+        res.json({ approvals: runner.approvals(id)?.list() ?? [] });
+      });
+      app.post("/admin/tasks/:id/cancel", adminGuard, (req, res) => {
+        const id = req.params.id;
+        if (typeof id !== "string") { res.status(400).end(); return; }
+        runner.cancel(id);
+        res.json({ cancellationRequested: true });
+      });
+      app.post("/admin/tasks/:id/approvals/:requestId/:decision", adminGuard, (req, res) => {
+        const { id, requestId, decision } = req.params;
+        if (typeof id !== "string" || typeof requestId !== "string" || (decision !== "accept" && decision !== "decline")) { res.status(400).end(); return; }
+        const broker = runner.approvals(id);
+        const matches = broker?.list().filter((item) => String(item.id) === requestId) ?? [];
+        if (matches.length !== 1 || !broker) { res.status(404).end(); return; }
+        try { broker.decide(matches[0].id, decision); res.json({ decided: true }); }
+        catch { res.status(409).json({ error: "approval_unavailable" }); }
+      });
+    }
+  }
+
   app.post("/admin/pairing", adminGuard, (_req, res) => {
     const session = pairing.create();
     logger.info("Created pairing session");
@@ -168,6 +247,7 @@ export async function startBridge(opts: BridgeOptions): Promise<Bridge> {
       publicUrl: publicBaseUrl,
       tunnel: tunnel.status(),
       tokenCount: authStore.tokenCount(),
+      executionEnabled: Boolean(taskRunner),
       pairingActive: pairing.hasActiveSession(),
       pid: process.pid,
       startedAt,
@@ -198,6 +278,7 @@ export async function startBridge(opts: BridgeOptions): Promise<Bridge> {
 
   app.post("/admin/revoke-all", adminGuard, (_req, res) => {
     const count = authStore.revokeAll();
+    void taskRunner?.close();
     pairing.invalidateAll();
     logger.info(`Revoked all tokens (${count})`);
     res.json({ revoked: count });
@@ -235,6 +316,7 @@ export async function startBridge(opts: BridgeOptions): Promise<Bridge> {
   const shutdown = async (): Promise<void> => {
     if (closed) return;
     closed = true;
+    await taskRunner?.close();
     await tunnel.stop().catch(() => undefined);
     await new Promise<void>((resolve) => server.close(() => resolve()));
     if (opts.persistRuntime !== false) clearRuntimeState(workspace.id);

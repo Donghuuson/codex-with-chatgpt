@@ -9,7 +9,11 @@ export const SUPPORTED_SCOPES = [
   "git.read",
   "execution.read",
   "offline_access",
+  "task.submit",
 ] as const;
+
+// Execution is opt-in: existing and scope-less clients remain read-only.
+const DEFAULT_SCOPES = SUPPORTED_SCOPES.filter((scope) => scope !== "task.submit");
 
 export type Scope = (typeof SUPPORTED_SCOPES)[number];
 
@@ -260,6 +264,13 @@ export class AuthStore {
     return this.tokens.size;
   }
 
+  /** Local authorization metadata only; never returns credentials or hashes. */
+  authorizedClients(scope: Scope): string[] {
+    const now = Date.now();
+    return [...new Set([...this.tokens.values()].filter((token) => !token.revoked && token.expiresAt > now &&
+      token.workspaceId === this.workspaceId && token.scopes.includes(scope)).map((token) => token.clientId))];
+  }
+
   static deleteStateFile(workspaceId: string): void {
     const file = path.join(getStateDir(), "auth", `${workspaceId}.json`);
     try {
@@ -271,8 +282,8 @@ export class AuthStore {
 }
 
 export function filterScopes(requested: string | undefined): string[] {
-  if (!requested || requested.trim() === "") return [...SUPPORTED_SCOPES];
+  if (!requested || requested.trim() === "") return [...DEFAULT_SCOPES];
   const asked = requested.split(/[\s+]+/).filter(Boolean);
   const granted = asked.filter((scope) => (SUPPORTED_SCOPES as readonly string[]).includes(scope));
-  return granted.length > 0 ? granted : [...SUPPORTED_SCOPES];
+  return granted.length > 0 ? granted : [...DEFAULT_SCOPES];
 }

@@ -6,6 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { startBridge, type Bridge } from "../src/bridge/server.js";
 import { appendExecutionRecord } from "../src/execution/records.js";
 import { saveExecutionOutput } from "../src/execution/output.js";
+import { TaskQueue } from "../src/execution/task-queue.js";
 import { makeTmpDir, cleanup, write, makeGitRepo, git, isolateStateDir } from "./helpers.js";
 
 let root: string;
@@ -77,6 +78,43 @@ afterAll(async () => {
 });
 
 describe("MCP tools over Streamable HTTP", () => {
+  it("exposes task submission only with explicit experimental opt-in and scope", async () => {
+    const taskBridge = await startBridge({ workspaceRoot: root, port: 0, persistRuntime: false, authStoreFile: path.join(makeTmpDir("task-auth"), "store.json"), taskQueue: new TaskQueue() });
+    const clients: Client[] = [];
+    const connect = async (clientId: string, scopes: string[]): Promise<Client> => {
+      const token = taskBridge.authStore.issueTokens({ clientId, scopes }).accessToken;
+      const testClient = new Client({ name: clientId, version: "1" });
+      await testClient.connect(new StreamableHTTPClientTransport(new URL(`${taskBridge.localBaseUrl()}/mcp`), { requestInit: { headers: { authorization: `Bearer ${token}` } } }));
+      clients.push(testClient);
+      return testClient;
+    };
+    try {
+      const reader = await connect("reader", ["workspace.read"]);
+      const denied = await reader.callTool({ name: "task_submit", arguments: { message: "Inspect" } });
+      expect(denied.isError).toBe(true);
+      const author = await connect("author", ["task.submit"]);
+      const submitted = jsonOf<{ id: string; state: string }>(await author.callTool({ name: "task_submit", arguments: { message: "Inspect" } }));
+      expect(submitted.state).toBe("pending");
+      expect(jsonOf<{ state: string }>(await author.callTool({ name: "task_status", arguments: { id: submitted.id } })).state).toBe("pending");
+      const stranger = await connect("stranger", ["task.submit"]);
+      expect((await stranger.callTool({ name: "task_status", arguments: { id: submitted.id } })).isError).toBe(true);
+      const approveUrl = `${taskBridge.localBaseUrl()}/admin/tasks/${submitted.id}/approve`;
+      expect((await fetch(approveUrl, { method: "POST" })).status).toBe(404);
+      expect((await fetch(approveUrl, { method: "POST", headers: { authorization: `Bearer ${taskBridge.adminToken}`, "x-forwarded-for": "203.0.113.1" } })).status).toBe(404);
+      expect((await fetch(approveUrl, { method: "POST", headers: { authorization: `Bearer ${taskBridge.adminToken}` } })).status).toBe(200);
+      expect(jsonOf<{ state: string }>(await author.callTool({ name: "task_status", arguments: { id: submitted.id } })).state).toBe("approved");
+      expect((await fetch(approveUrl, { method: "POST", headers: { authorization: `Bearer ${taskBridge.adminToken}` } })).status).toBe(409);
+      const second = jsonOf<{ id: string }>(await author.callTool({ name: "task_submit", arguments: { message: "Reject me" } }));
+      const url = `${taskBridge.localBaseUrl()}/admin/tasks/${second.id}/reject`;
+      expect((await fetch(url, { method: "POST" })).status).toBe(404);
+      expect((await fetch(url, { method: "POST", headers: { authorization: `Bearer ${taskBridge.adminToken}`, "x-forwarded-for": "203.0.113.1" } })).status).toBe(404);
+      expect((await fetch(url, { method: "POST", headers: { authorization: `Bearer ${taskBridge.adminToken}` } })).status).toBe(200);
+      expect(jsonOf<{ state: string }>(await author.callTool({ name: "task_status", arguments: { id: second.id } })).state).toBe("rejected");
+    } finally {
+      await Promise.all(clients.map((testClient) => testClient.close()));
+      await taskBridge.close();
+    }
+  });
   it("lists all ten read-only tools", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((tool) => tool.name).sort();
