@@ -172,9 +172,3 @@ into a new workspace path; it does not overwrite existing files.
 - [Local dashboard](docs/dashboard.md)
 - [Troubleshooting](docs/troubleshooting.md)
 
-## Attribution and license
-
-Based on [XiaoDuoYa/codex-with-chatgpt](https://github.com/XiaoDuoYa/codex-with-chatgpt).
-Original attribution and the [MIT license](LICENSE) are retained.
-
-Unofficial community project. Not affiliated with or endorsed by OpenAI.
